@@ -8,6 +8,8 @@ MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.or
 
 # aGTBoost
 
+## Eirik sin master
+
 **Adaptive and automatic gradient tree boosting computations**
 
 aGTBoost is a lightning fast gradient boosting library designed to **avoid manual tuning** and **cross-validation** by utilizing an information theoretic approach.
