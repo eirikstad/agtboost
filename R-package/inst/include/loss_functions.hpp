@@ -6,6 +6,19 @@
 #include "external_rcpp.hpp"
 
 // ----------- LOSS --------------
+double loss_gtb(Tvec<double> &g, Tvec<double> &h, Tvec<double> &pred)
+{
+    // GTB approximate loss: sum_i g*pred + 0.5*h*pred^2
+    int n = g.size();
+    double loss = 0.0;
+    for(int i=0; i<n; i++)
+    {
+        loss += g[i]*pred[i] + 0.5*h[i]*pred[i]*pred[i];
+    }
+    return loss / n;
+}
+
+
 double loss(Tvec<double> &y, Tvec<double> &pred, std::string loss_type, Tvec<double> &w, ENSEMBLE* ens_ptr){
     int n = y.size();
     double res = 0;

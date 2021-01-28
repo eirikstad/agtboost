@@ -138,6 +138,10 @@ double ENSEMBLE::initial_prediction(Tvec<double> &y, std::string loss_function, 
 
 void ENSEMBLE::train(Tvec<double> &y, Tmat<double> &X, int verbose, bool greedy_complexities, 
                      bool force_continued_learning, Tvec<double> &w){
+    double sample_rate = 0.7;
+    int MAX_NO_REDUCTION = 50;
+    int counter = 0;
+    
     // Set init -- mean
     int MAXITER = nrounds;
     int n = y.size(); 
@@ -196,12 +200,28 @@ void ENSEMBLE::train(Tvec<double> &y, Tmat<double> &X, int verbose, bool greedy_
             break;
         }
         
+        // Sampling
+        //     int n = v.size(); 
+        //     int size = (int)(sample_rate * n); // the double is strictly positive
+        //     Tvec<int> ind = sample_int(n, size);
+        // sample_rate
+        // g, h, X
+        Tvec<int> ind_sub = sample_int_rate(n, sample_rate);
+        Tvec<double> g_sub = sample_vec(g, ind_sub);
+        Tvec<double> h_sub = sample_vec(h, ind_sub);
+        Tmat<double> X_sub = matrix_subset(X, ind_sub);
         
-        new_tree->train(g, h, X, cir_sim, greedy_complexities, learning_rate_set);
+        // Train tree
+        new_tree->train(g_sub, h_sub, X_sub, cir_sim, greedy_complexities, learning_rate_set);
+        //new_tree->train(g, h, X, cir_sim, greedy_complexities, learning_rate_set);
         
         // EXPECTED LOSS
-        expected_loss = (new_tree->getTreeScore()) * (-2)*learning_rate_set*(learning_rate_set/2 - 1) + 
-            learning_rate_set * new_tree->getTreeOptimism();
+        Tvec<double> pred_tmp = new_tree->predict_data(X);
+        expected_loss = loss_gtb(g, h, pred_tmp) * (-2)*learning_rate_set*(learning_rate_set/2 - 1) + 
+            sample_rate * learning_rate_set * new_tree->getTreeOptimism();
+        
+        //expected_loss = (new_tree->getTreeScore()) * (-2)*learning_rate_set*(learning_rate_set/2 - 1) + 
+        //    learning_rate_set * new_tree->getTreeOptimism();
             //1.0*learning_rate_set * new_tree->getFeatureMapOptimism();
 
         // Update preds -- if should not be updated for last iter, it does not matter much computationally
@@ -225,11 +245,23 @@ void ENSEMBLE::train(Tvec<double> &y, Tmat<double> &X, int verbose, bool greedy_
         // Check for continued learning
         if(!force_continued_learning){
             
-            // No forced learning
-            // Check criterion
+            // Vil egentlig sjekke generaliseringsloss over boosting iterasjonar for full ensemble!!!
+            // Men proxy her:
+            
+            // Sjekke om eloss < 0
+            // if true then counter = 0
             if(expected_loss > EPS){
+                counter += 1;
+            }else{
+                counter = 0;
+            }
+            
+            // Dersom counter >= 50, then break
+            if(counter > MAX_NO_REDUCTION)
+            {
                 break;
             }
+            
             
         }
         

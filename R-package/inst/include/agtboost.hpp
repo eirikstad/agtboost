@@ -21,6 +21,7 @@
 #include "optimization.hpp"
 #include "loss_functions.hpp"
 #include "gbt_count_auto.hpp"
+#include "sampling.hpp"
 
 
 #endif // __GMGTB_HPP_INCLUDED__
