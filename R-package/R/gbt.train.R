@@ -1,6 +1,6 @@
 #' aGTBoost Training.
 #'
-#' \code{gbt.train} is an interface for training an \pkg{agtboost} model.
+#' \code{gbt.train} is an interface for extra training an \pkg{agtboost} model.
 #'
 #' @param y response vector for training. Must correspond to the design matrix \code{x}.
 #' @param x design matrix for training. Must be of type \code{matrix}.
@@ -17,6 +17,8 @@
 #'   }
 #' @param nrounds a just-in-case max number of boosting iterations. Default: 50000
 #' @param verbose Enable boosting tracing information at i-th iteration? Default: \code{0}.
+#' @param sample_rate Sampling rate for each boosting iteration
+#' @param step description
 #' @param gsub_compare Deprecated. Boolean: Global-subset comparisons. \code{FALSE} means standard GTB, \code{TRUE} compare subset-splits with global splits (next root split). Default: \code{TRUE}.
 #' @param algorithm specify the algorithm used for gradient tree boosting.
 #'   \itemize{
@@ -81,9 +83,9 @@
 #' @rdname gbt.train
 #' @export
 #' @importFrom methods new
-gbt.train <- function(y, x, learning_rate = 0.01,
+gbt.train <- function(y, x, learning_rate = 0.01, sample_rate = 1,
                       loss_function = "mse", nrounds = 50000,
-                      verbose=0, gsub_compare,
+                      verbose=0, gsub_compare, step = FALSE,
                       algorithm = "global_subset",
                       previous_pred=NULL,
                       weights = NULL,
@@ -235,7 +237,7 @@ gbt.train <- function(y, x, learning_rate = 0.01,
     if(is.null(weights))
         weights = rep(1,nrow(x))
     
-    param <- list("learning_rate" = learning_rate, 
+    param <- list("learning_rate" = learning_rate,
                   "loss_function" = loss_function, 
                   "nrounds"=nrounds,
                   "extra_param" = extra_param)
@@ -263,12 +265,13 @@ gbt.train <- function(y, x, learning_rate = 0.01,
         mod$set_param(nrounds, learning_rate, extra_param, loss_function)
         
         # train ensemble
-        if(is.null(previous_pred)){
-            
+        if(sample_rate != 2){
+            # Train with sampling
+            mod$sample_train(y,x, verbose, sample_rate, step, gsub_compare, force_continued_learning, weights)
+        }else if(is.null(previous_pred)){
             # train from scratch
             mod$train(y,x, verbose, gsub_compare, force_continued_learning, weights)   
         }else{
-            
             # train from previous predictions
             mod$train_from_preds(previous_pred,y,x, verbose, gsub_compare, weights)
         }

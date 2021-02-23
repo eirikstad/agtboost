@@ -12,6 +12,9 @@ class ENSEMBLE
 {
 public:
     int nrounds;
+    int best_it;
+    double sample_rate;
+    bool step;
     double initialPred;
     double learning_rate;
     double initial_score;
@@ -34,11 +37,14 @@ public:
     std::string get_loss_function();
     
     double initial_prediction(Tvec<double> &y, std::string loss_function, Tvec<double> &w);
+    void sample_train(Tvec<double> &y, Tmat<double> &X, int verbose, double sample_rate, bool step, bool greedy_complexities,
+               bool force_continued_learning, Tvec<double> &w);
     void train(Tvec<double> &y, Tmat<double> &X, int verbose, bool greedy_complexities,
                bool force_continued_learning, Tvec<double> &w);
     void train_from_preds(Tvec<double> &pred, Tvec<double> &y, Tmat<double> &X, int verbose, bool greedy_complexities, Tvec<double> &w);
     Tvec<double> predict(Tmat<double> &X);
     Tvec<double> predict2(Tmat<double> &X, int num_trees);
+    Tvec<double> predict3(Tmat<double> &X);
     double estimate_generalization_loss(int num_trees);
     int get_num_trees();
     Tvec<double> get_num_leaves();

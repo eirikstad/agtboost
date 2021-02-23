@@ -30,7 +30,7 @@ public:
     
     ENSEMBLE* get_count_mod();
     
-    void train(Tvec<double> &y, Tmat<double> &X, int verbose, bool greedy_complexities);
+    void train(Tvec<double> &y, Tmat<double> &X, int verbose, double sample_rate, bool greedy_complexities);
     
     Tvec<double> predict(Tmat<double> &X);
 };
