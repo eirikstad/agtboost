@@ -83,13 +83,13 @@
 #' @rdname gbt.train
 #' @export
 #' @importFrom methods new
-gbt.train <- function(y, x, learning_rate = 0.01, sample_rate = 1,
+gbt.train <- function(y, x, learning_rate = 0.01, sample_rate = NULL,
                       loss_function = "mse", nrounds = 50000,
-                      verbose=0, gsub_compare, step = FALSE,
+                      verbose=0, gen_loss_type = "actual", gsub_compare, step_type = "std",
                       algorithm = "global_subset",
                       previous_pred=NULL,
                       weights = NULL,
-                      force_continued_learning=FALSE,
+                      force_continued_learning=FALSE, include_constant = FALSE, exclude_bad = FALSE,
                       ...){
     
     # Deprecated messages
@@ -111,6 +111,7 @@ gbt.train <- function(y, x, learning_rate = 0.01, sample_rate = 1,
         #"Error: param must be provided as a list \n",
         "learning_rate" = "\n Error: learning_rate must be a number between 0 and 1 \n",
         "loss_fun" = "\n Error: loss_function must be a valid loss function. See documentation for valid parameters \n",
+        "sample_rate" = "\n Error: sample_rate must be a number between 0 and 1 \n",
         "nrounds" = "\n Error: nrounds must be an integer >= 1 \n",
         "verbose" = "\n Error: verbose must be of type numeric with length 1",
         #"\n Error: gsub_compare must be of type logical with length 1",
@@ -144,6 +145,13 @@ gbt.train <- function(y, x, learning_rate = 0.01, sample_rate = 1,
     }else{
         #error
         error_messages <- c(error_messages, error_messages_type["learning_rate"])
+    }
+
+    #sample_rate
+    if(!is.null(sample_rate)){
+        if(sample_rate[1] != 999 & (max(sample_rate)>1 | min(sample_rate)<0)){
+            error_messages <- c(error_messages, error_messages_type["sample_rate"])
+        }
     }
     
     # loss function
@@ -264,20 +272,18 @@ gbt.train <- function(y, x, learning_rate = 0.01, sample_rate = 1,
         mod <- new(ENSEMBLE)
         mod$set_param(nrounds, learning_rate, extra_param, loss_function)
         
-        # train ensemble
-        if(sample_rate != 2){
-            # Train with sampling
-            mod$sample_train(y,x, verbose, sample_rate, step, gsub_compare, force_continued_learning, weights)
-        }else if(is.null(previous_pred)){
-            # train from scratch
-            mod$train(y,x, verbose, gsub_compare, force_continued_learning, weights)   
+
+
+        if(is.null(sample_rate)){
+            if(is.null(previous_pred)){
+                mod$train(y,x, verbose, gsub_compare, force_continued_learning, weights)
+            }else{
+                mod$train_from_preds(previous_pred,y,x, verbose, gsub_compare, weights)
+            }
         }else{
-            # train from previous predictions
-            mod$train_from_preds(previous_pred,y,x, verbose, gsub_compare, weights)
+            mod$sample_train(y,x, verbose, gen_loss_type, sample_rate, step_type, gsub_compare, force_continued_learning, weights, exclude_bad, include_constant)
         }
-        
     }
-    
     
     # return trained agtboost ensemble
     return(mod)

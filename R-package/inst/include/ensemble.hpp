@@ -14,7 +14,6 @@ public:
     int nrounds;
     int best_it;
     double sample_rate;
-    bool step;
     double initialPred;
     double learning_rate;
     double initial_score;
@@ -37,8 +36,8 @@ public:
     std::string get_loss_function();
     
     double initial_prediction(Tvec<double> &y, std::string loss_function, Tvec<double> &w);
-    void sample_train(Tvec<double> &y, Tmat<double> &X, int verbose, double sample_rate, bool step, bool greedy_complexities,
-               bool force_continued_learning, Tvec<double> &w);
+    void sample_train(Tvec<double> &y, Tmat<double> &X, int verbose, std::string gen_loss_type, Tvec<double> sample_rate, std::string step_type, bool greedy_complexities,
+               bool force_continued_learning, Tvec<double> &w, bool exclude_bad, bool include_constant);
     void train(Tvec<double> &y, Tmat<double> &X, int verbose, bool greedy_complexities,
                bool force_continued_learning, Tvec<double> &w);
     void train_from_preds(Tvec<double> &pred, Tvec<double> &y, Tmat<double> &X, int verbose, bool greedy_complexities, Tvec<double> &w);
