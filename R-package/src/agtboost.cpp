@@ -250,16 +250,18 @@ void ENSEMBLE::train(Tvec<double> &y, Tmat<double> &X, int verbose, bool greedy_
 void ENSEMBLE::sample_train(Tvec<double> &y, Tmat<double> &X, int verbose, std::string gen_loss_type, 
                      Tvec<double> sample_rate, std::string step_type, bool greedy_complexities, 
                      bool force_continued_learning, Tvec<double> &w, bool exclude_bad,
-                     bool include_constant){
+                     bool include_constant, bool keep_tail, int max_max_no_red, std::string change_criteria, double seed){
     
-
+    if(seed != 999){
+        std::srand(seed);
+    }
     int MAXITER = nrounds;
     int n = y.size();
     double learning_rate_set = this->learning_rate; 
     double sample_rate_orig = 0;
 
     double sample_rate_set = sample_rate[0];
-    int MAX_NO_REDUCTION = 100 - 100 * (sample_rate_set*sample_rate_set*sample_rate_set);
+    int MAX_NO_REDUCTION = max_max_no_red - max_max_no_red * (sample_rate_set*sample_rate_set*sample_rate_set);
 
     if(sample_rate_set == 999){
       sample_rate_orig = 999;
@@ -273,10 +275,12 @@ void ENSEMBLE::sample_train(Tvec<double> &y, Tmat<double> &X, int verbose, std::
   
     bool increasing = false;
     double EPS = 1E-9;
+    double prog_EPS = 1E-9;
     double total_opt = 0.0;
     double gen_loss = 0.0;
     double expected_loss;
     double gen_loss_change = 0.0;
+    double last_change_ratio = 0.0;
     double best_gen_loss = 0.0;
     double new_initial_score = 0.0;
     double best_opt = 0.0;
@@ -317,9 +321,10 @@ void ENSEMBLE::sample_train(Tvec<double> &y, Tmat<double> &X, int verbose, std::
 
     this->first_tree = new GBTREE;
     this->first_tree->train(g_sub, h_sub, X_sub, cir_sim, greedy_complexities, learning_rate_set);
+    
     GBTREE* current_tree = this->first_tree;
     GBTREE* current_best_tree = this->first_tree;
-
+    current_tree->sampleRate=sample_rate_set;
     Tvec<double> pred_tmp = current_tree->predict_data(X);
 
     pred = pred + learning_rate_set * pred_tmp;
@@ -363,16 +368,18 @@ void ENSEMBLE::sample_train(Tvec<double> &y, Tmat<double> &X, int verbose, std::
             gen_loss_change = gen_loss - best_gen_loss;
     }
 
-
+    int i = 2;
+    int round = 0;
+    bool improved = false;
     for(int j=0; j<(sample_rate.size()); j++){
         
-        double max_NR = 0;
+        
         sample_rate_set = sample_rate[j];
-        int MAX_NO_REDUCTION = 100 - 100 * (sample_rate_set*sample_rate_set*sample_rate_set);
+        int MAX_NO_REDUCTION = max_max_no_red - max_max_no_red * (sample_rate_set*sample_rate_set*sample_rate_set);
         if(sample_rate_set == 999){
-            MAX_NO_REDUCTION = 50;
+            MAX_NO_REDUCTION = max_max_no_red;
         }
-        for(int i=2; i<(MAXITER+1); i++){
+        while(i<(MAXITER+1)){
             if(sample_rate_orig == 999){
                 float LO = 0.1;
                 float HI = 1.0;
@@ -386,6 +393,7 @@ void ENSEMBLE::sample_train(Tvec<double> &y, Tmat<double> &X, int verbose, std::
 
             // TRAINING
             GBTREE* new_tree = new GBTREE();
+            new_tree -> sampleRate = sample_rate_set;
 
             best_pred = pred;
 
@@ -479,12 +487,13 @@ void ENSEMBLE::sample_train(Tvec<double> &y, Tmat<double> &X, int verbose, std::
                             "  |  tr loss: " << loss(y, best_pred, loss_function, w, this) <<
 
                             "  |  gen loss: " << gen_loss_change << 
-                            "  |  highest pred: " << best_pred.maxCoeff() << 
-                            "  |  lowest pred: " << ((-1)*best_pred).maxCoeff() << 
+                            //"  |  highest pred: " << best_pred.maxCoeff() << 
+                            //"  |  lowest pred: " << ((-1)*best_pred).maxCoeff() << 
                             // "  |  optimism: " << opt_tmp << 
                             //"  |  reduction: " << gen_loss_change << 
-                            //"  |  sampSize: " << sample_rate_set << 
-                            //"  |  best it: " << best_it << 
+                            "  |  EPS: " << EPS << 
+                            "  |  sampSize: " << sample_rate_set << 
+                            "  |  best it: " << best_it << 
                             std::endl;
                     
                 }
@@ -509,15 +518,19 @@ void ENSEMBLE::sample_train(Tvec<double> &y, Tmat<double> &X, int verbose, std::
                 best_opt = total_opt;
             }
             else{
+                if(change_criteria == "progressive"){
+                    EPS = pow(0.5, round)*last_change_ratio*1.1*best_gen_loss+prog_EPS;
 
+                }
                 if(gen_loss_change < EPS){
-                    if (counter>max_NR){
-                        max_NR = counter;
-                    }
+
+                    last_change_ratio = gen_loss_change/best_gen_loss;
                     counter = 0;
                     gen_loss_change = 0;
+                    improved = true;
                     
                     // sample_rate_set = orig_sample_rate_set; //for shifting rate
+
                     current_tree->next_tree = new_tree;
                     current_tree = new_tree;
                     current_best_tree = new_tree;
@@ -532,16 +545,15 @@ void ENSEMBLE::sample_train(Tvec<double> &y, Tmat<double> &X, int verbose, std::
                         change = 0.0;
                         this->initialPred = this->initialPred + const_pred;
                     }
+
                     if(step_type == "pulse"){
                         if(j>0){
                             j = -1;
                             break;
                         }
-                    }else if(step_type == "repeat"){
-                        if(j == (sample_rate.size() - 1)){
-                            j = -1;
-                        }
+                        //Repeat is starting all over again after last iteration if we achieve improvement in the round
                     }
+                        
                     
                 }
                 else{
@@ -565,14 +577,17 @@ void ENSEMBLE::sample_train(Tvec<double> &y, Tmat<double> &X, int verbose, std::
                    
 
                     if(counter > MAX_NO_REDUCTION){
-                        current_best_tree->next_tree = NULL;
-                        current_tree = current_best_tree;
+                        if(!keep_tail){
+                          current_best_tree->next_tree = NULL;
+                          current_tree = current_best_tree;
+                          pred = keep_pred;
+                          best_pred = keep_pred;
+                          total_opt = best_opt;
+                          R_opt = best_R_opt;
+                        }
                         counter = 0;
                         change = 0.0;
-                        pred = keep_pred;
-                        best_pred = keep_pred;
-                        total_opt = best_opt;
-                        R_opt = best_R_opt;
+                        
 
                         break;
                         
@@ -580,7 +595,20 @@ void ENSEMBLE::sample_train(Tvec<double> &y, Tmat<double> &X, int verbose, std::
                 }
             }
             
+
+
+            i++;
         }
+
+        if(step_type == "repeat"){
+                                if(improved){
+                                    if(j == (sample_rate.size() - 1)){
+                                        round++;
+                                        j = -1;
+                                        improved = false;
+                                    }
+                                }
+                            }
 
         // Rcpp::Rcout  <<
         //   std::setprecision(4) <<
@@ -767,33 +795,87 @@ Tvec<double> ENSEMBLE::predict3(Tmat<double> &X){
     return pred;
 }
 
+
+
 double ENSEMBLE::estimate_generalization_loss(int num_trees){
-    
-    int tree_num = 1;
-    double total_observed_reduction = 0.0;
-    double total_optimism = 0.0;
-    double learning_rate = this->learning_rate;
-    GBTREE* current = this->first_tree;
-    
-    if(num_trees<1){
-        while(current != NULL){
-            total_observed_reduction += current->getTreeScore();
-            total_optimism += current->getTreeOptimism();
-            current = current->next_tree;
-        }
-    }else{
-        while(current != NULL){
-            total_observed_reduction += current->getTreeScore();
-            total_optimism += current->getTreeOptimism();
-            current = current->next_tree;
-            tree_num++;
-            if(tree_num > num_trees) break;
-        }
+  
+  int tree_num = 1;
+  double total_observed_reduction = 0.0;
+  double total_optimism = 0.0;
+  double learning_rate = this->learning_rate;
+  GBTREE* current = this->first_tree;
+  
+  if(num_trees<1){
+    while(current != NULL){
+      total_observed_reduction += current->getTreeScore();
+      total_optimism += current->getTreeOptimism();
+      current = current->next_tree;
     }
-    //std::cout<< (this->initial_score) << std::endl;
-    return (this->initial_score) + total_observed_reduction * (-2)*learning_rate*(learning_rate/2 - 1) + 
-        learning_rate * total_optimism;
+  }else{
+    while(current != NULL){
+      total_observed_reduction += current->getTreeScore();
+      total_optimism += current->getTreeOptimism();
+      current = current->next_tree;
+      tree_num++;
+      if(tree_num > num_trees) break;
+    }
+  }
+  //std::cout<< (this->initial_score) << std::endl;
+  return (this->initial_score) + total_observed_reduction * (-2)*learning_rate*(learning_rate/2 - 1) + 
+    learning_rate * total_optimism;
+  
+}
+
+
+double ENSEMBLE::estimate_generalization_loss_smpl(int num_trees, Tvec<double> &y, Tmat<double> &X){
+  
+
+    // Number of trees
+    int K = num_trees;
+    double gen_loss;
+    double total_optimism = 0;
     
+    // Prepare prediction vector
+    int n = X.rows();
+    Tvec<double> pred(n);
+    pred.setConstant(this->initialPred);
+    
+    // Unit weights
+    Tvec<double> w(n);
+    w.setOnes();
+    
+    GBTREE* current = this->first_tree;
+    for(int k=1; k<(K+1); k++)
+    {
+      // Update predictions with k'th tree
+      pred = pred + (this->learning_rate) * (current->predict_data(X));
+      
+      total_optimism = total_optimism + (this->learning_rate) * (current->sampleRate) * (current->getTreeOptimism());
+      // Compute loss
+      
+      
+      // Update to next tree
+      current = current->next_tree;
+      
+      // Check if NULL ptr
+      if(current == NULL)
+      {
+        break;
+      }
+    }
+    gen_loss = loss(y, pred, this->loss_function, w, this) + total_optimism;
+    return gen_loss;
+}
+
+Tvec<double> ENSEMBLE::get_sample_rates(){
+    int num_trees = this->get_num_trees();
+    Tvec<double> sample_rates(num_trees);
+    GBTREE* current = this->first_tree;
+    for(int i=0; i<num_trees; i++){
+        sample_rates[i] = current->sampleRate;
+        current = current->next_tree;
+    }
+    return sample_rates;
 }
 
 int ENSEMBLE::get_num_trees(){
@@ -1021,6 +1103,8 @@ RCPP_MODULE(aGTBModule) {
         .method("predict2", &ENSEMBLE::predict2)
         .method("predict3", &ENSEMBLE::predict3)
         .method("estimate_generalization_loss", &ENSEMBLE::estimate_generalization_loss)
+        .method("estimate_generalization_loss_smpl", &ENSEMBLE::estimate_generalization_loss_smpl)
+        .method("get_sample_rates", &ENSEMBLE::get_sample_rates)
         .method("get_num_trees", &ENSEMBLE::get_num_trees)
         .method("get_num_leaves", &ENSEMBLE::get_num_leaves)
         .method("save_model", &ENSEMBLE::save_model)

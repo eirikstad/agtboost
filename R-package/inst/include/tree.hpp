@@ -16,6 +16,7 @@ public:
     
     node* root;
     GBTREE* next_tree;
+    double sampleRate;
     
     GBTREE();
 

@@ -89,7 +89,9 @@ gbt.train <- function(y, x, learning_rate = 0.01, sample_rate = NULL,
                       algorithm = "global_subset",
                       previous_pred=NULL,
                       weights = NULL,
-                      force_continued_learning=FALSE, include_constant = FALSE, exclude_bad = FALSE,
+                      force_continued_learning=FALSE, include_constant = FALSE, exclude_bad = FALSE, keep_tail = FALSE,
+                      max_max_no_red = 100, change_criteria = "std", seed = 999,
+                      
                       ...){
     
     # Deprecated messages
@@ -281,7 +283,9 @@ gbt.train <- function(y, x, learning_rate = 0.01, sample_rate = NULL,
                 mod$train_from_preds(previous_pred,y,x, verbose, gsub_compare, weights)
             }
         }else{
-            mod$sample_train(y,x, verbose, gen_loss_type, sample_rate, step_type, gsub_compare, force_continued_learning, weights, exclude_bad, include_constant)
+            mod$sample_train(y,x, verbose, gen_loss_type, sample_rate, step_type, gsub_compare, 
+                force_continued_learning, weights, exclude_bad, include_constant, keep_tail,
+                max_max_no_red, change_criteria, seed)
         }
     }
     

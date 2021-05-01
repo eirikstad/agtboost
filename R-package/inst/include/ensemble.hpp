@@ -16,6 +16,7 @@ public:
     double sample_rate;
     double initialPred;
     double learning_rate;
+    Tvec<double> sample_rates;
     double initial_score;
     double extra_param; // Needed for certain distributions s.a. negative binomial, typically a dispersion param
     std::string loss_function;
@@ -37,16 +38,19 @@ public:
     
     double initial_prediction(Tvec<double> &y, std::string loss_function, Tvec<double> &w);
     void sample_train(Tvec<double> &y, Tmat<double> &X, int verbose, std::string gen_loss_type, Tvec<double> sample_rate, std::string step_type, bool greedy_complexities,
-               bool force_continued_learning, Tvec<double> &w, bool exclude_bad, bool include_constant);
+               bool force_continued_learning, Tvec<double> &w, bool exclude_bad, bool include_constant, bool keep_tail,
+               int max_max_no_red, std::string change_criteria, double seed);
     void train(Tvec<double> &y, Tmat<double> &X, int verbose, bool greedy_complexities,
                bool force_continued_learning, Tvec<double> &w);
     void train_from_preds(Tvec<double> &pred, Tvec<double> &y, Tmat<double> &X, int verbose, bool greedy_complexities, Tvec<double> &w);
     Tvec<double> predict(Tmat<double> &X);
     Tvec<double> predict2(Tmat<double> &X, int num_trees);
     Tvec<double> predict3(Tmat<double> &X);
+    double estimate_generalization_loss_smpl(int num_trees, Tvec<double> &y, Tmat<double> &X);
     double estimate_generalization_loss(int num_trees);
     int get_num_trees();
     Tvec<double> get_num_leaves();
+    Tvec<double> get_sample_rates();
     void serialize(ENSEMBLE *eptr, std::ofstream& f);
     void deSerialize(ENSEMBLE *eptr, std::ifstream& f);
     void save_model(std::string filepath);
